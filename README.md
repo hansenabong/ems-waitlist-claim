@@ -2,7 +2,7 @@
 
 A Laravel event-management application focused on **capacity-safe booking, FIFO waitlisting, time-limited seat claims, and reliable backend workflows**.
 
-The project was built as a university software-development project and focuses primarily on backend correctness: transactions, concurrency-sensitive booking logic, role-based access, scheduled processing, and automated feature testing.
+The project was built as a university software-development project and focuses primarily on backend correctness: transactions, concurrency-sensitive booking logic, role-based access, scheduled processing, and regression validation across critical workflows.
 
 ## What the application does
 
@@ -26,7 +26,7 @@ When an event is full, attendees can join a FIFO waitlist. If a booked attendee 
 - `lockForUpdate()` row locking around event capacity and waitlist state
 - Protection against duplicate/oversold bookings at the application workflow level
 - Soft-deleted waitlist entries
-- PHPUnit feature tests for booking and waitlist behaviour
+- PHPUnit regression coverage for booking, waitlist, authentication, profile, and organiser workflows
 - Git-based Laravel project structure suitable for further extension
 
 ## Concurrency and booking integrity
@@ -63,7 +63,7 @@ Commit transaction
 
 The same idea is used when cancelling a booking and when processing expired waitlist offers so that capacity checks and FIFO decisions are made consistently.
 
-> **Note:** the repository defaults to SQLite for local development. For realistic row-locking/concurrency behaviour, use a database that supports the locking semantics required by `SELECT ... FOR UPDATE`, such as PostgreSQL or MySQL.
+> **Note:** the repository still defaults to SQLite for simple local setup. For realistic row-locking and concurrency behaviour, PostgreSQL or MySQL should be used because they provide the locking semantics required by `SELECT ... FOR UPDATE`.
 
 ## Waitlist workflow
 
@@ -99,20 +99,20 @@ The scheduled command is registered to run every minute:
 Schedule::command('waitlist:process-expired')->everyMinute();
 ```
 
-## Automated testing
+## Automated regression checks
 
-The project uses **PHPUnit** through Laravel's testing framework.
+The project uses **PHPUnit 12** through Laravel's testing framework.
 
-The feature suite covers behaviours including:
+The current suite contains **49 passing tests with 125 assertions** and covers behaviours including:
 
 - joining and leaving an event waitlist
 - showing waitlist actions when an event is full
 - notifying the next waitlisted attendee after a cancellation
 - claiming a seat with a temporary signed URL
-- rejecting/rotating expired claim windows
+- rejecting and rotating expired claim windows
 - processing expired offers through the Artisan command
 - blocking normal bookings while a seat is temporarily held for a waitlisted attendee
-- attendee, organiser, profile, and authentication flows
+- attendee, organiser, profile, registration, and authentication flows
 
 Run the suite with:
 
@@ -120,18 +120,18 @@ Run the suite with:
 php artisan test
 ```
 
-The current suite validates the surrounding business rules and transaction-based workflow. A dedicated multi-process/parallel test that fires truly concurrent booking requests is a useful future improvement.
+The suite is used primarily as a regression safety net while the backend is upgraded and extended. It validates surrounding business rules and transaction-based workflow, but it does **not** yet perform a true multi-process test with simultaneous booking requests.
 
 ## Technology stack
 
 | Area | Technology |
 | --- | --- |
-| Backend | PHP 8.2+, Laravel 12 |
+| Backend | PHP 8.3+, Laravel 13 |
 | UI | Blade, Tailwind CSS, Alpine.js |
 | Frontend tooling | Vite |
-| Database | SQLite by default; Laravel-supported relational databases can be configured |
+| Database | SQLite by default; PostgreSQL targeted for realistic locking/concurrency validation |
 | Authentication | Laravel authentication scaffolding / authenticated routes |
-| Testing | PHPUnit 11 |
+| Testing | PHPUnit 12 |
 | Scheduling | Laravel Scheduler + Artisan command |
 | Email | Laravel Mail |
 | Version control | Git / GitHub |
@@ -171,6 +171,8 @@ Then run the migrations and demo seeders:
 php artisan migrate --seed
 ```
 
+For PostgreSQL, configure the standard Laravel database environment variables (`DB_CONNECTION`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD`) before running migrations.
+
 ### 4. Start the application
 
 A convenient development command is:
@@ -185,6 +187,8 @@ Alternatively, run the Laravel server and Vite separately:
 php artisan serve
 npm run dev
 ```
+
+> On native Windows/XAMPP environments, Laravel Pail may not run because `pcntl` is unavailable. In that case, run the server, Vite, queue worker, and scheduler as separate processes.
 
 ### 5. Run the scheduler
 
@@ -232,14 +236,15 @@ Waitlist progression should not depend on a user opening a page or performing an
 
 ### Why keep the UI server-rendered?
 
-The project prioritises backend behaviour and business-rule correctness. Blade keeps the UI layer straightforward while the more interesting engineering work remains visible in the booking, waitlist, transaction, scheduling, and test logic.
+The project prioritises backend behaviour and business-rule correctness. Blade keeps the UI layer straightforward while the more interesting engineering work remains visible in the booking, waitlist, transaction, and scheduling logic.
 
 ## Current limitations and possible improvements
 
 This is a working learning/portfolio project rather than a finished commercial event platform. Useful next steps include:
 
-- add a true parallel/concurrency integration test against PostgreSQL or MySQL
-- add CI to run the test suite automatically on pull requests
+- complete the PostgreSQL migration and validate all existing migrations against PostgreSQL
+- add a true parallel/concurrency integration test against PostgreSQL
+- add CI to run the regression suite automatically on pull requests
 - improve the visual design and responsive UX
 - add richer event search, filtering, pagination, and organiser reporting
 - move mail delivery to queued jobs for production-style operation
@@ -257,7 +262,8 @@ This project strengthened my understanding of:
 - authentication and authorisation boundaries
 - signed URLs and time-limited workflows
 - scheduled background processing
-- automated feature testing with PHPUnit
+- using automated regression checks while changing backend behaviour and framework versions
+- upgrading Laravel dependencies and resolving PHP/runtime compatibility issues
 - debugging interactions between controllers, database state, mail, and scheduled commands
 
 ---
